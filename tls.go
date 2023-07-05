@@ -207,9 +207,26 @@ func (t *TLSFlags) GetTLSConfigForTarget(target *ScanTarget) (*tls.Config, error
 		ret.CurvePreferences = nil
 	}
 
+	// Example: 0x12A1 where 0x12 is the signature algorithm and 0xA1 is the hashing algorithm.
 	if t.SignatureAlgorithms != "" {
-		// TODO FIXME: Implement (none of the signatureAndHash functions/consts are exported from common.go...?)
-		log.Fatalf("--signature-algorithms not implemented")
+		strSigs := getCSV(t.SignatureAlgorithms)
+		intSigs := make([]tls.SigAndHash, len(strSigs))
+
+		for i, s := range strSigs {
+			s = strings.TrimPrefix(s, "0x")
+			sigAndHash, err := strconv.ParseUint(s, 16, 16)
+			if err != nil {
+				log.Fatalf("signature algorithms: unable to convert %s to a 16bit integer: %s", s, err)
+			}
+			signature := uint8(sigAndHash >> 8)
+			hash := uint8(sigAndHash)
+
+			intSigs[i] = tls.SigAndHash{
+				Signature: signature,
+				Hash:      hash,
+			}
+		}
+		ret.SignatureAndHashes = intSigs
 	}
 
 	if t.HeartbeatEnabled || t.Heartbleed {
